@@ -1,0 +1,246 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Panel de Administración</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0-beta3/css/all.min.css">
+    <link rel="stylesheet" href="css/admin.css">
+</head>
+<body class="min-h-screen flex">
+
+    <!-- LOGIN VIEW -->
+    <div id="login-view" class="fixed inset-0 bg-gray-100 flex items-center justify-center">
+        <div class="bg-white p-8 rounded-xl shadow-2xl w-full max-w-md">
+            <h2 class="text-3xl font-bold text-gray-900 mb-6 text-center">Acceso Administrador</h2>
+            <div id="login-error" class="bg-red-100 text-red-700 p-3 rounded-md mb-4 hidden" role="alert"></div>
+            <div class="space-y-4">
+                <div>
+                    <label for="email" class="block text-sm font-medium text-gray-700">Email</label>
+                    <input type="email" id="email" value="admin@tienda.com" placeholder="admin@tienda.com" class="mt-1 block w-full px-4 py-2 border border-gray-300 rounded-lg">
+                </div>
+                <div>
+                    <label for="password" class="block text-sm font-medium text-gray-700">Contraseña</label>
+                    <input type="password" id="password" value="123456" placeholder="••••••••" class="mt-1 block w-full px-4 py-2 border border-gray-300 rounded-lg">
+                </div>
+                <button id="login-btn" class="w-full bg-indigo-600 text-white py-2 px-4 rounded-lg font-semibold hover:bg-indigo-700 transition duration-150 shadow-md">
+                    Ingresar
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <!-- DASHBOARD VIEW -->
+    <div id="dashboard-view" class="flex w-full hidden">
+        <aside class="sidebar text-white p-4 flex flex-col justify-between h-screen sticky top-0">
+            <div>
+                <h1 class="text-2xl font-bold mb-8 text-indigo-400">Tienda Admin</h1>
+                <nav class="space-y-2">
+                    <div id="tab-productos" onclick="switchTab('productos')" class="tab-btn active">
+                        <i class="fas fa-boxes w-6"></i><span class="ml-3">Productos</span>
+                    </div>
+                    <div id="tab-pedidos" onclick="switchTab('pedidos')" class="tab-btn text-gray-400 hover:text-white">
+                        <i class="fas fa-shipping-fast w-6"></i><span class="ml-3">Pedidos</span>
+                    </div>
+                    <div id="tab-turno" onclick="switchTab('turno')" class="tab-btn text-gray-400 hover:text-white">
+                        <i class="fas fa-cash-register w-6"></i><span class="ml-3">Turno / Caja Diaria</span>
+                    </div>
+                    <div id="tab-contabilidad" onclick="switchTab('contabilidad')" class="tab-btn text-gray-400 hover:text-white">
+                        <i class="fas fa-file-invoice-dollar w-6"></i><span class="ml-3">Contabilidad Histórica</span>
+                    </div>
+                </nav>
+            </div>
+            <button id="logout-btn" class="w-full bg-red-600 text-white py-2 rounded-lg font-semibold hover:bg-red-700 transition duration-150">
+                <i class="fas fa-sign-out-alt mr-2"></i> Cerrar Sesión
+            </button>
+        </aside>
+
+        <main class="flex-1 p-8">
+            <header class="mb-8 flex justify-between items-center border-b pb-4">
+                <h2 id="main-title" class="text-3xl font-bold text-gray-800">Gestión de Productos</h2>
+                <div class="flex items-center space-x-3">
+                    <span class="text-sm font-medium text-gray-600">Estado del Turno:</span>
+                    <span id="shift-status" class="px-3 py-1 rounded-full text-xs font-bold bg-gray-200 text-gray-600">CERRADO</span>
+                </div>
+            </header>
+
+            <!-- SECCIÓN PRODUCTOS -->
+            <section id="section-productos" class="space-y-6">
+                <div class="flex justify-between items-center">
+                    <h3 class="text-2xl font-semibold text-gray-700">Gestión de Productos</h3>
+                    <button id="btn-add-product" class="bg-indigo-600 text-white py-2 px-4 rounded-lg font-semibold hover:bg-indigo-700 transition duration-150 shadow-md">
+                        <i class="fas fa-plus mr-2"></i> Añadir Producto
+                    </button>
+                </div>
+
+                <div class="flex space-x-4 bg-white p-4 rounded-xl shadow-sm">
+                    <input type="text" id="product-search" placeholder="Buscar por nombre o categoría..." class="flex-1 px-4 py-2 border border-gray-300 rounded-lg">
+                    <select id="stock-filter" class="px-4 py-2 border border-gray-300 rounded-lg">
+                        <option value="all">Todo el Stock</option>
+                        <option value="low">Stock Bajo (&lt; 5)</option>
+                        <option value="out">Sin Stock (0)</option>
+                    </select>
+                </div>
+
+                <div class="bg-white rounded-xl shadow-lg overflow-hidden">
+                    <table class="min-w-full divide-y divide-gray-200">
+                        <thead class="bg-gray-50">
+                            <tr>
+                                <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Imagen</th>
+                                <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Nombre</th>
+                                <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Categoría</th>
+                                <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Precio</th>
+                                <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Stock</th>
+                                <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Acciones</th>
+                            </tr>
+                        </thead>
+                        <tbody id="products-list" class="bg-white divide-y divide-gray-200"></tbody>
+                    </table>
+                </div>
+            </section>
+
+            <!-- SECCIÓN PEDIDOS -->
+            <section id="section-pedidos" class="hidden space-y-8">
+                <h3 class="text-2xl font-semibold text-gray-700">Gestión de Pedidos</h3>
+                <div class="grid grid-cols-1 md:grid-cols-2 gap-8">
+                    <div>
+                        <h4 class="text-xl font-bold text-orange-600 mb-4 border-b pb-2">Pendientes de Despacho</h4>
+                        <div id="orders-pending-list" class="space-y-4"></div>
+                    </div>
+                    <div>
+                        <h4 class="text-xl font-bold text-indigo-600 mb-4 border-b pb-2">Historial (Despachados/Cancelados)</h4>
+                        <div id="orders-history-list" class="space-y-4 max-h-96 overflow-y-auto pr-2"></div>
+                    </div>
+                </div>
+            </section>
+
+            <!-- SECCIÓN TURNO / CAJA DIARIA -->
+            <section id="section-turno" class="hidden space-y-6">
+                <h3 class="text-2xl font-semibold text-gray-700">Control de Caja y Turno Diario</h3>
+                <div class="bg-white p-6 rounded-xl shadow-md flex justify-between items-center">
+                    <div class="flex space-x-4">
+                        <button id="btn-open-shift" class="bg-green-600 text-white py-3 px-6 rounded-lg font-semibold hover:bg-green-700 transition shadow-lg">
+                            <i class="fas fa-door-open mr-2"></i> Abrir Turno
+                        </button>
+                        <button id="btn-close-shift" disabled class="bg-red-600 text-white py-3 px-6 rounded-lg font-semibold hover:bg-red-700 transition shadow-lg opacity-50 cursor-not-allowed">
+                            <i class="fas fa-door-closed mr-2"></i> Cerrar y Liquidar
+                        </button>
+                    </div>
+                    <p class="text-sm text-gray-500" id="shift-start-time-display">Hora de Inicio: <span class="font-bold text-gray-700">--:--</span></p>
+                </div>
+
+                <div id="shift-summary-view" class="grid grid-cols-1 md:grid-cols-3 gap-6 bg-white p-6 rounded-xl shadow-md hidden">
+                    <div class="text-center p-4 border-r">
+                        <p class="text-gray-500 text-sm">Ventas del Turno</p>
+                        <p id="shift-summary-sales" class="text-3xl font-bold text-green-600 mt-1">$0</p>
+                    </div>
+                    <div class="text-center p-4 border-r">
+                        <p class="text-gray-500 text-sm">Egresos del Turno</p>
+                        <p id="shift-summary-expenses" class="text-3xl font-bold text-red-600 mt-1">$0</p>
+                    </div>
+                    <div class="text-center p-4">
+                        <p class="text-gray-500 text-sm">Neto del Turno</p>
+                        <p id="shift-summary-net" class="text-3xl font-bold text-indigo-600 mt-1">$0</p>
+                    </div>
+                </div>
+
+                <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
+                    <div class="bg-white p-6 rounded-xl shadow-md">
+                        <h4 class="text-xl font-bold mb-4 text-gray-700">Registro de Egresos de Caja</h4>
+                        <p class="text-sm text-gray-500 mb-4">Solo para gastos operativos del turno.</p>
+                        <div class="space-y-4">
+                            <input type="number" id="shift-expense-amount" placeholder="Monto del Gasto" class="block w-full px-4 py-2 border border-gray-300 rounded-lg" min="0">
+                            <input type="text" id="shift-expense-desc" placeholder="Detalle (ej: Taxis)" class="block w-full px-4 py-2 border border-gray-300 rounded-lg">
+                            <button id="btn-register-shift-expense" class="w-full bg-orange-500 text-white py-2 rounded-lg font-semibold hover:bg-orange-600">Registrar Egreso del Turno</button>
+                        </div>
+                    </div>
+                    <div class="bg-white p-6 rounded-xl shadow-md">
+                        <h4 class="text-xl font-bold mb-4 text-gray-700">Egresos Registrados en Turno</h4>
+                        <ul id="shift-expenses-list" class="space-y-2 max-h-60 overflow-y-auto pr-2"></ul>
+                    </div>
+                </div>
+            </section>
+
+            <!-- SECCIÓN CONTABILIDAD HISTÓRICA -->
+            <section id="section-contabilidad" class="hidden space-y-6">
+                <h3 class="text-2xl font-semibold text-gray-700">Contabilidad y Reportes Periódicos</h3>
+                <div class="bg-white p-6 rounded-xl shadow-md flex justify-between items-center">
+                    <div class="flex space-x-4 items-center">
+                        <label class="text-gray-700 font-medium">Desde:</label>
+                        <input type="date" id="report-start-date" class="px-3 py-2 border border-gray-300 rounded-lg">
+                        <label class="text-gray-700 font-medium">Hasta:</label>
+                        <input type="date" id="report-end-date" class="px-3 py-2 border border-gray-300 rounded-lg">
+                        <button id="btn-filter-report" class="bg-gray-200 text-gray-700 py-2 px-4 rounded-lg">Filtrar</button>
+                    </div>
+                    <button id="btn-export-data" class="bg-green-600 text-white py-2 px-4 rounded-lg font-semibold hover:bg-green-700 transition shadow-md">
+                        <i class="fas fa-download mr-2"></i> Exportar Datos (CSV)
+                    </button>
+                </div>
+
+                <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
+                    <div class="bg-white p-6 rounded-xl shadow-md">
+                        <h4 class="text-xl font-bold mb-4 text-gray-700">Registro de Egresos Periódicos/Generales</h4>
+                        <div class="space-y-4 mb-6">
+                            <input type="number" id="expense-amount" placeholder="Monto del Gasto" class="block w-full px-4 py-2 border border-gray-300 rounded-lg" min="0">
+                            <input type="text" id="expense-desc" placeholder="Detalle (ej: Pago Arriendo)" class="block w-full px-4 py-2 border border-gray-300 rounded-lg">
+                            <button id="btn-register-expense" class="w-full bg-blue-600 text-white py-2 rounded-lg font-semibold hover:bg-blue-700">Registrar Gasto Histórico</button>
+                        </div>
+                        <h4 class="text-xl font-bold mb-4 border-t pt-4 text-gray-700">Historial de Egresos</h4>
+                        <ul id="accounting-expenses-list" class="space-y-2 max-h-96 overflow-y-auto pr-2"></ul>
+                    </div>
+
+                    <div class="space-y-6">
+                        <div class="bg-white p-6 rounded-xl shadow-md">
+                            <h4 class="text-xl font-bold text-gray-700 mb-4">Resumen de Ventas Globales</h4>
+                            <div class="flex justify-between items-center py-2 border-b">
+                                <span class="text-gray-600">Ventas Totales (Período):</span>
+                                <span id="summary-sales-historical" class="text-2xl font-bold text-green-700">$0</span>
+                            </div>
+                            <div class="flex justify-between items-center py-2 border-b">
+                                <span class="text-gray-600">Egresos Totales (Período):</span>
+                                <span id="summary-expenses-historical" class="text-2xl font-bold text-red-700">$0</span>
+                            </div>
+                            <div class="flex justify-between items-center py-2 pt-4">
+                                <span class="text-gray-600 font-bold">Balance Neto:</span>
+                                <span id="summary-net-historical" class="text-3xl font-extrabold text-indigo-600">$0</span>
+                            </div>
+                            <p class="text-xs text-gray-400 mt-2">Seleccione el período y presione "Filtrar".</p>
+                        </div>
+                    </div>
+                </div>
+            </section>
+        </main>
+    </div>
+
+    <!-- MODAL PRODUCTO (overlay) -->
+    <div id="product-modal" class="fixed inset-0 modal-overlay z-50 flex items-start md:items-center justify-center hidden">
+        <div id="product-modal-content" class="bg-white p-6 md:p-8 rounded-xl shadow-2xl w-full max-w-2xl max-h-[90vh] overflow-y-auto">
+            <h3 id="modal-title" class="text-2xl font-bold text-gray-900 mb-4 border-b pb-3">Nuevo Producto</h3>
+            <form id="product-form" class="space-y-4" onsubmit="return false;">
+                <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <div class="space-y-4">
+                        <div><label for="p-name" class="block text-sm font-medium text-gray-700">Nombre</label><input type="text" id="p-name" required class="mt-1 block w-full px-4 py-2 border border-gray-300 rounded-lg"></div>
+                        <div><label for="p-category" class="block text-sm font-medium text-gray-700">Categoría</label><input type="text" id="p-category" list="category-list" class="mt-1 block w-full px-4 py-2 border border-gray-300 rounded-lg"><datalist id="category-list"></datalist></div>
+                        <div><label for="p-price" class="block text-sm font-medium text-gray-700">Precio ($)</label><input type="number" id="p-price" required min="0" step="0.01" class="mt-1 block w-full px-4 py-2 border border-gray-300 rounded-lg"></div>
+                        <div><label for="p-stock" class="block text-sm font-medium text-gray-700">Stock (Unidades)</label><input type="number" id="p-stock" required min="0" class="mt-1 block w-full px-4 py-2 border border-gray-300 rounded-lg"></div>
+                        <div class="flex space-x-4"><div class="flex items-center"><input id="p-featured" type="checkbox" class="h-4 w-4 text-indigo-600 border-gray-300 rounded"><label for="p-featured" class="ml-2 block text-sm text-gray-900">Destacado</label></div><div class="flex items-center"><input id="p-offer" type="checkbox" class="h-4 w-4 text-indigo-600 border-gray-300 rounded"><label for="p-offer" class="ml-2 block text-sm text-gray-900">Oferta</label></div></div>
+                    </div>
+                    <div class="space-y-4">
+                        <div><label for="p-desc" class="block text-sm font-medium text-gray-700">Descripción</label><textarea id="p-desc" rows="3" class="mt-1 block w-full px-4 py-2 border border-gray-300 rounded-lg"></textarea></div>
+                        <div><label for="p-sizes" class="block text-sm font-medium text-gray-700">Tallas (Separadas por coma)</label><input type="text" id="p-sizes" placeholder="S, M, L" class="mt-1 block w-full px-4 py-2 border border-gray-300 rounded-lg"></div>
+                        <div><label for="p-colors" class="block text-sm font-medium text-gray-700">Colores (Separados por coma)</label><input type="text" id="p-colors" placeholder="Rojo, Azul" class="mt-1 block w-full px-4 py-2 border border-gray-300 rounded-lg"></div>
+                        <div class="border p-3 rounded-lg"><label class="block text-sm font-medium text-gray-700 mb-2">Imagen</label><img id="p-image-preview" src="https://via.placeholder.com/80" alt="Preview" class="w-20 h-20 object-cover rounded-lg mb-2"><input type="text" id="p-image-url" placeholder="URL de la imagen" class="block w-full px-4 py-2 border border-gray-300 rounded-lg mb-2"><p class="text-xs text-gray-500 mb-1 text-center">O sube un archivo (se guardará en Supabase Storage)</p><input type="file" id="p-image-file" accept="image/*" class="block w-full text-sm text-gray-500"></div>
+                    </div>
+                </div>
+            </form>
+            <div class="mt-4 flex justify-end space-x-3">
+                <button id="btn-cancel-product" type="button" class="px-4 py-2 border border-gray-300 rounded-lg text-gray-700 hover:bg-gray-50">Cancelar</button>
+                <button id="btn-save-product" type="button" class="px-4 py-2 bg-indigo-600 text-white rounded-lg font-semibold hover:bg-indigo-700">Guardar</button>
+            </div>
+        </div>
+    </div>
+
+    <script src="js/admin.js"></script>
+</body>
+</html>
