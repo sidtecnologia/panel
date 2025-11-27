@@ -67,7 +67,7 @@ function formatCurrency(value) {
 }
 
 function escapeHtml(s = '') {
-    return String(s).replace(/&/g,'&amp;').replace(/"/g,'&quot;').replace(/'/g,'&#39;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+    return String(s).replace(/&/g,'&amp;').replace(/"/g,'&quot;').replace(/'/g,'&#39;').replace(/</g,'&lt;').replace(/</g,'&gt;');
 }
 
 function debounce(fn, wait) { let t; return function(...a){ clearTimeout(t); t = setTimeout(()=>fn.apply(this,a), wait); }; }
@@ -360,9 +360,7 @@ async function saveProduct() {
         const uploadedUrls = await uploadMultipleFiles(modalNewFiles);
         const finalImages = [...modalExistingImages, ...uploadedUrls];
 
-        // --- CAMBIO SOLICITADO ---
-        // Se guardan como STRING (texto) separado por comas, sin array ni comillas extra.
-        // .join(', ') convierte el array limpio a texto: "S, M, L"
+        // --- Mantenemos el cambio anterior (tallas y colores como string) ---
         const productData = {
             name: document.getElementById('p-name').value,
             description: document.getElementById('p-desc').value,
@@ -375,7 +373,7 @@ async function saveProduct() {
             colors: document.getElementById('p-colors').value.split(',').map(s => s.trim()).filter(Boolean).join(', '),
             image: finalImages
         };
-        // ------------------------
+        // -------------------------------------------------------------------
 
         let url = `${BASE_API}/products`;
         let method = 'POST';
@@ -525,11 +523,20 @@ function renderOrdersList(orders, containerId, isPending) {
     }).join('');
 }
 
-// Confirmar pedido: PATCH order_status only (no confirmed_at) to avoid schema errors
+// Confirmar pedido: PATCH order_status y payment_status
 async function confirmOrder(id) {
     try {
-        await fetchAPI(`${BASE_API}/orders?id=eq.${id}`, { method: 'PATCH', body: JSON.stringify({ order_status: 'Confirmado' }) });
-        // Give DB trigger time to move to orders_confirmed if configured
+        // Objeto para actualizar: marca el pedido como Confirmado y Pagado.
+        // Se ELIMINA la actualización de confirmed_at porque no existe en la tabla 'orders'.
+        // El trigger debe encargarse de poner la fecha al moverlo a 'orders_confirmed'.
+        const updateData = {
+            order_status: 'Confirmado',
+            payment_status: 'Pagado',
+        };
+
+        await fetchAPI(`${BASE_API}/orders?id=eq.${id}`, { method: 'PATCH', body: JSON.stringify(updateData) });
+        
+        // Damos tiempo al trigger de la BD para mover el pedido
         setTimeout(() => loadOrders(), 700);
     } catch (err) {
         alert('Error al confirmar pedido: ' + (err.message || JSON.stringify(err)));
@@ -537,9 +544,18 @@ async function confirmOrder(id) {
     }
 }
 
+// Actualiza estado de pedidos pendientes (ej: Cancelar)
 async function updatePendingOrderStatus(id, status) {
     try {
-        await fetchAPI(`${BASE_API}/orders?id=eq.${id}`, { method: 'PATCH', body: JSON.stringify({ order_status: status }) });
+        const updateData = {
+            order_status: status
+        };
+        // Si se cancela, aseguramos que el pago no está aprobado (si fuera necesario)
+        if (status === 'Cancelado') {
+            updateData.payment_status = 'Fallido';
+        }
+
+        await fetchAPI(`${BASE_API}/orders?id=eq.${id}`, { method: 'PATCH', body: JSON.stringify(updateData) });
         loadOrders();
     } catch (err) {
         alert('Error actualizando estado: ' + (err.message || JSON.stringify(err)));
@@ -937,7 +953,7 @@ function openExportModal() {
         try {
             const [ordersData, expensesData] = await Promise.all([ordersPromise, expensesPromise]);
             let csv = "data:text/csv;charset=utf-8,Tipo,Fecha,Monto,Detalle\n";
-            if (Array.isArray(ordersData)) ordersData.forEach(o => csv += `Venta,${new Date(o.created_at || o.confirmed_at || Date.now()).toISOString()},${o.total_amount || 0},"Pedido ${(o.customer_name||'').replace(/"/g,'""')}"\n`);
+            if (Array.isArray(ordersData)) ordersData.forEach(o => csv += `Venta,${new Date(o.created_at || o.confirmed_at || Date.now()).toISOString()},${o.total_amount || 0},"${(o.customer_name||'').replace(/"/g,'""')}"\n`);
             if (Array.isArray(expensesData)) expensesData.forEach(e => csv += `Egreso,${new Date(e.time).toISOString()},-${e.cant || 0},"${(e.detail||'').replace(/"/g,'""')}"\n`);
             const encoded = encodeURI(csv);
             const link = document.createElement('a'); link.href = encoded; link.download = 'export_contabilidad.csv'; document.body.appendChild(link); link.click(); document.body.removeChild(link);
@@ -1072,6 +1088,7 @@ function globalClickHandler(e) {
     if (confirmBtn) { const oid = confirmBtn.dataset.orderId; if (oid) confirmOrder(oid); return; }
 
     const cancelBtn = e.target.closest('.cancel-order-btn');
+    // Usamos updatePendingOrderStatus para Cancelar
     if (cancelBtn) { const oid = cancelBtn.dataset.orderId; if (oid) updatePendingOrderStatus(oid, 'Cancelado'); return; }
 
     const dispatchBtn = e.target.closest('.dispatch-order-btn');
