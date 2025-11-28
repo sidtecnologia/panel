@@ -103,6 +103,10 @@ async function fetchAPI(url, options = {}) {
 document.addEventListener('DOMContentLoaded', () => {
     if (sessionToken) initDashboard(); else showView('login-view');
 
+    // Set sidebar logo from configured company logo if present
+    const sidebarLogo = document.getElementById('sidebar-logo');
+    if (sidebarLogo) sidebarLogo.src = COMPANY_LOGO_URL;
+
     // Auth
     document.getElementById('login-btn')?.addEventListener('click', handleLogin);
     document.getElementById('logout-btn')?.addEventListener('click', handleLogout);
@@ -117,6 +121,7 @@ document.addEventListener('DOMContentLoaded', () => {
     // Turno
     document.getElementById('btn-open-shift')?.addEventListener('click', openShift);
     document.getElementById('btn-close-shift')?.addEventListener('click', closeShift); // opens modal for confirmation
+    document.getElementById('btn-register-shift-expense')?.addEventListener('click', () => registerExpense(true));
 
     // Contabilidad
     document.getElementById('btn-register-expense')?.addEventListener('click', () => registerExpense(false));
@@ -488,7 +493,7 @@ function renderOrdersList(orders, containerId, isPending) {
 
     container.innerHTML = orders.map(o => {
         const items = o.order_items || [];
-        const itemsHtml = Array.isArray(items) ? items.map(i => `<div class="text-xs text-gray-600">${i.qty}x ${escapeHtml(i.name||'')} ${escapeHtml(i.size||'')} ${escapeHtml(i.color||'')}</div>`).join('') : '<span class="text-xs text-red-500">Error formato items</span>';
+        const itemsHtml = Array.isArray(items) ? items.map(i => `<div class="text-xs text-gray-600">${i.qty}x ${escapeHtml(i.name||'')} ${escapeHtml(i.size||'')} ${escapeHtml(i.color||'')}</div>`).join('') : '';
 
         let actions = '';
         if (isPending) {
@@ -528,9 +533,44 @@ function renderOrdersList(orders, containerId, isPending) {
 // Confirmar pedido: PATCH order_status y payment_status
 async function confirmOrder(id) {
     try {
-        // Objeto para actualizar: marca el pedido como Confirmado y Pagado.
-        // Se ELIMINA la actualización de confirmed_at porque no existe en la tabla 'orders'.
-        // El trigger debe encargarse de poner la fecha al moverlo a 'orders_confirmed'.
+        // Traer el pedido completo para procesar items y descontar stock
+        const ordersData = await fetchAPI(`${BASE_API}/orders?id=eq.${id}&select=*`);
+        const order = Array.isArray(ordersData) && ordersData.length > 0 ? ordersData[0] : null;
+        if (!order) throw new Error('Pedido no encontrado para confirmar.');
+
+        // Intentar descontar stock por cada item del pedido antes de confirmar.
+        // Se busca el producto por nombre (first match) y se actualiza stock = stock - qty (no negativo).
+        if (Array.isArray(order.order_items)) {
+            for (const item of order.order_items) {
+                try {
+                    const name = (item.name || '').trim();
+                    if (!name) continue;
+                    // Buscar producto por nombre exacto (puede ajustarse si hay product_id en items)
+                    const productsFound = await fetchAPI(`${BASE_API}/products?select=*&name=eq.${encodeURIComponent(name)}&limit=1`);
+                    if (Array.isArray(productsFound) && productsFound.length > 0) {
+                        const prod = productsFound[0];
+                        const currentStock = Number(prod.stock || 0);
+                        const qtyToSubtract = Number(item.qty || 0);
+                        const newStock = Math.max(0, currentStock - qtyToSubtract);
+                        // PATCH producto con nuevo stock solo si hay cambio
+                        if (newStock !== currentStock) {
+                            await fetchAPI(`${BASE_API}/products?id=eq.${prod.id}`, {
+                                method: 'PATCH',
+                                body: JSON.stringify({ stock: newStock })
+                            });
+                        }
+                    } else {
+                        // No se encontró producto por nombre; loggear y continuar
+                        console.warn(`Producto no encontrado para descontar stock: "${name}" (pedido ${id})`);
+                    }
+                } catch (errItem) {
+                    console.error('Error descontando stock para item:', item, errItem);
+                    // Continuar con otros items aunque uno falle
+                }
+            }
+        }
+
+        // Después de intentar descontar stock, marcar como confirmado y pagado.
         const updateData = {
             order_status: 'Confirmado',
             payment_status: 'Pagado',
@@ -538,7 +578,7 @@ async function confirmOrder(id) {
 
         await fetchAPI(`${BASE_API}/orders?id=eq.${id}`, { method: 'PATCH', body: JSON.stringify(updateData) });
         
-        // Damos tiempo al trigger de la BD para mover el pedido
+        // Damos tiempo al trigger de la BD para mover el pedido a orders_confirmed
         setTimeout(() => loadOrders(), 700);
     } catch (err) {
         alert('Error al confirmar pedido: ' + (err.message || JSON.stringify(err)));
@@ -557,7 +597,21 @@ async function updatePendingOrderStatus(id, status) {
             updateData.payment_status = 'Fallido';
         }
 
+        // Primero actualizamos el estado
         await fetchAPI(`${BASE_API}/orders?id=eq.${id}`, { method: 'PATCH', body: JSON.stringify(updateData) });
+
+        // Si es cancelación, eliminarlo de la tabla orders inmediatamente.
+        if (status === 'Cancelado') {
+            try {
+                // Intentamos eliminar. Si la fila ya fue movida por un trigger, la eliminación puede fallar; lo capturamos.
+                await fetchAPI(`${BASE_API}/orders?id=eq.${id}`, { method: 'DELETE' });
+            } catch (errDel) {
+                // No interrumpimos el flujo por un error en la eliminación; solo lo logueamos.
+                console.warn('No se pudo eliminar el pedido después de marcar como Cancelado (posible movimiento por trigger o ya eliminado):', errDel);
+            }
+        }
+
+        // Refrescar lista inmediatamente para remover de la UI
         loadOrders();
     } catch (err) {
         alert('Error actualizando estado: ' + (err.message || JSON.stringify(err)));
@@ -600,7 +654,7 @@ async function printInvoice(orderId) {
         const invoiceHtml = `
             <html>
             <head><title>Factura - ${escapeHtml(order.id || '')}</title>
-            <style>body{font-family:Arial;padding:20px;color:#111}.header{display:flex;justify-content:space-between;margin-bottom:20px}.logo{max-width:200px;max-height:60px;object-fit:contain}table{width:100%;border-collapse:collapse}th,td{border:1px solid #ddd;padding:8px}</style>
+            <style>body{font-family:Arial;padding:20px;color:#111}.header{display:flex;justify-content:space-between;margin-bottom:20px}.logo{max-width:200px;max-height:60px;object-fit:contain}table{width:100%;border-collapse:collapse}th,td{border:1px solid #eee;padding:8px;text-align:left}thead th{background:#f9fafb}</style>
             </head>
             <body>
                 <div class="header">
@@ -788,7 +842,7 @@ async function showCloseShiftModal() {
         const content = modal.querySelector('div > div').outerHTML;
         const win = window.open('', '_blank', 'width=900,height=700');
         if (!win) return alert('No se pudo abrir la ventana de impresión (bloqueador?).');
-        win.document.write(`<html><head><title>Resumen Turno</title><style>body{font-family:Arial;padding:20px} table{width:100%;border-collapse:collapse} th,td{border:1px solid #ddd;padding:6px}</style></head><body><h2>Resumen de Turno - ${startDate.toLocaleString('es-CO')}</h2>${content}</body></html>`);
+        win.document.write(`<html><head><title>Resumen Turno</title><style>body{font-family:Arial;padding:20px} table{width:100%;border-collapse:collapse} th,td{border:1px solid #ddd;padding:6px}</style></head><body>${content}</body></html>`);
         win.document.close();
         win.focus();
         setTimeout(() => win.print(), 500);
@@ -1090,8 +1144,16 @@ function globalClickHandler(e) {
     if (confirmBtn) { const oid = confirmBtn.dataset.orderId; if (oid) confirmOrder(oid); return; }
 
     const cancelBtn = e.target.closest('.cancel-order-btn');
-    // Usamos updatePendingOrderStatus para Cancelar
-    if (cancelBtn) { const oid = cancelBtn.dataset.orderId; if (oid) updatePendingOrderStatus(oid, 'Cancelado'); return; }
+    // Usamos updatePendingOrderStatus para Cancelar; pedimos confirmación para evitar cancelaciones accidentales
+    if (cancelBtn) {
+        const oid = cancelBtn.dataset.orderId;
+        if (oid) {
+            if (confirm('¿Confirmar cancelación de este pedido?')) {
+                updatePendingOrderStatus(oid, 'Cancelado');
+            }
+        }
+        return;
+    }
 
     const dispatchBtn = e.target.closest('.dispatch-order-btn');
     if (dispatchBtn) { const oid = dispatchBtn.dataset.orderId; if (oid) dispatchOrder(oid); return; }
