@@ -304,6 +304,7 @@ function openProductModal(product = null) {
     document.getElementById('p-stock').value = product?.stock ?? '';
     document.getElementById('p-featured').checked = !!product?.featured;
     document.getElementById('p-offer').checked = !!product?.isOffer;
+    document.getElementById('p-seller').checked = !!product?.bestSeller;
     document.getElementById('p-sizes').value = Array.isArray(product?.sizes) ? product.sizes.join(', ') : (product?.sizes || '');
     document.getElementById('p-colors').value = Array.isArray(product?.colors) ? product.colors.join(', ') : (product?.colors || '');
     if (product?.image && Array.isArray(product.image)) modalExistingImages = [...product.image];
@@ -369,6 +370,7 @@ async function saveProduct() {
             stock: parseInt(document.getElementById('p-stock').value) || 0,
             featured: document.getElementById('p-featured').checked,
             isOffer: document.getElementById('p-offer').checked,
+            bestSeller: document.getElementById('p-seller').checked,
             sizes: document.getElementById('p-sizes').value.split(',').map(s => s.trim()).filter(Boolean).join(', '),
             colors: document.getElementById('p-colors').value.split(',').map(s => s.trim()).filter(Boolean).join(', '),
             image: finalImages
